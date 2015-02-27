@@ -30,7 +30,7 @@
 
 (defn resolve-dependency
   "Download and extract dependency - return dependency project map."
-  [{:keys [name version]}]
+  [[name version]]
   (let [url (str "https://github.com/" name "/archive/" version ".tar.gz")
         file-name (str "deps/" (str/replace (str name) "/" "-") ".tar.gz")
         dep-dir (str "deps/" name)]
@@ -38,17 +38,18 @@
       (println "Downloading" name)
       (download url file-name)
       (extract-to file-name dep-dir)
-      (rm file-name)
-      (swap! *deps* assoc name version)
-      (-> (io/slurp (str dep-dir "/project.pxi"))
-          (read-string)
-          (rest)
-          (p/project->map)
-          (eval)))))
+      (rm file-name))
+    (swap! *deps* assoc name {:name name :version version})
+    (-> (io/slurp (str dep-dir "/project.pxi"))
+        (read-string)
+        (rest)
+        (p/project->map)
+        (eval))))
 
 (defn get-deps
   "Recursively download and extract all project dependencies."
   [project]
   (let [child-fn #(map resolve-dependency (:dependencies %))]
     (mkdir "deps")
-    (vec (tree-seq :dependencies child-fn project))))
+    (vec (tree-seq :dependencies child-fn project))
+    (swap! p/*project* assoc :dependencies (vals @*deps*))))
